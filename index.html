@@ -1,0 +1,658 @@
+<!doctype html>
+<title>AviJon</title>
+<style>
+	html, body{
+		background: black;
+		width: 100%;
+        height: 100%;
+       margin: 0;
+		overflow: hidden;
+		font-family: arcadeClassic;
+	}
+
+	#canvas-container {
+	   width: 100%;
+	text-align:center;
+	}
+
+	@font-face {
+    	font-family: arcadeClassic;
+    	src: url(ARCADECLASSIC.TTF);
+	}
+
+	canvas {           
+            display: inline;
+	}
+
+</style>
+<div id="canvas-container">
+	<canvas id = "canvas0" width="480" height="360" style="border: none;"></canvas>
+</div>
+<script>
+	// rAF
+window.requestAnimationFrame = function() {
+	return window.requestAnimationFrame ||
+		window.webkitRequestAnimationFrame ||
+		window.mozRequestAnimationFrame ||
+		window.msRequestAnimationFrame ||
+		window.oRequestAnimationFrame ||
+		function(f) {
+			window.setTimeout(f,1e3/60);
+		}
+}();
+
+var canvas = document.querySelector('#canvas0');
+var ctx = canvas.getContext('2d');
+
+var W = canvas.width;
+var H = canvas.height;
+var then = performance.now();
+var timer = 0;
+var requestId;
+var hitTarget;
+
+function resize() {
+
+    var canvasRatio = canvas.height / canvas.width;
+    var windowRatio = window.innerHeight / window.innerWidth;
+    var width;
+    var height;
+
+    if (windowRatio < canvasRatio) {
+        height = window.innerHeight;
+        width = height / canvasRatio;
+    } else {
+        width = window.innerWidth;
+        height = width * canvasRatio;
+    }
+
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+};
+
+window.addEventListener('resize', resize, false);
+resize();
+
+var tileAtlas = new Image();
+tileAtlas.src = 'tileset.png';
+
+var explStrip = new Image();
+explStrip.src = 'spr_smoke_strip24.png';
+var stripX = 0;
+
+var map = {
+	cols: 15,
+	rows: 110,
+	tsize: 32,
+	tiles: [ 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 5, 5, 5, 6, 88, 88, 88, 88, 88, 88, 88, 4, 5, 5, 5, 39, 39, 39, 40, 41, 42, 87, 87, 87, 36, 37, 38, 444, 444, 444, 285, 285, 285, 285, 286, 23, 87, 87, 87, 21, 444, 444, 444, 444, 463, 565, 565, 565, 566, 303, 23, 87, 87, 87, 21, 444, 444, 444, 444, 480, 359, 296, 297, 583, 303, 23, 87, 87, 87, 21, 444, 444, 463, 464, 481, 359, 313, 314, 583, 303, 23, 87, 87, 87, 21, 444, 444, 480, 481, 481, 359, 359, 359, 583, 303, 23, 87, 87, 87, 21, 444, 444, 497, 498, 498, 359, 359, 359, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 359, 359, 359, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 463, 464, 359, 359, 359, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 480, 481, 359, 359, 359, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 480, 481, 359, 294, 295, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 480, 481, 359, 311, 312, 583, 303, 23, 87, 87, 87, 21, 444, 444, 444, 497, 481, 599, 599, 599, 600, 303, 23, 87, 87, 87, 21, 444, 444, 444, 444, 497, 370, 370, 370, 370, 371, 23, 87, 87, 87, 21, 444, 444, 444, 444, 463, 387, 387, 387, 387, 388, 23, 87, 87, 87, 21, 444, 444, 444, 463, 481, 58, 58, 58, 58, 90, 91, 87, 87, 87, 21, 444, 444, 463, 481, 481, 71, 71, 71, 71, 107, 108, 87, 87, 87, 21, 444, 444, 480, 481, 481, 87, 87, 87, 87, 87, 87, 87, 87, 87, 21, 444, 444, 497, 481, 481, 87, 87, 87, 87, 87, 87, 87, 87, 87, 21, 444, 444, 444, 497, 481, 5, 5, 5, 5, 5, 6, 87, 87, 87, 21, 444, 444, 444, 444, 497, 464, 464, 464, 464, 465, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 276, 276, 291, 292, 482, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 379, 380, 308, 309, 482, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 396, 397, 291, 292, 482, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 396, 397, 308, 309, 482, 23, 87, 87, 87, 21, 444, 444, 444, 444, 444, 396, 397, 291, 292, 482, 23, 87, 87, 87, 53, 54, 54, 54, 54, 54, 396, 397, 308, 309, 482, 23, 87, 87, 87, 70, 71, 71, 71, 71, 71, 396, 397, 291, 292, 482, 23, 87, 87, 87, 87, 87, 87, 87, 87, 87, 396, 397, 308, 309, 482, 23, 87, 87, 87, 87, 87, 87, 87, 87, 87, 396, 397, 291, 292, 482, 23, 87, 87, 87, 4, 5, 5, 5, 5, 5, 413, 414, 308, 309, 482, 23, 87, 87, 87, 21, 282, 282, 282, 282, 282, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 180, 181, 181, 181, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 183, 217, 200, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 166, 166, 166, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 166, 166, 183, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 183, 166, 166, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 200, 166, 217, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 166, 183, 166, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 166, 166, 200, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 183, 166, 166, 359, 359, 359, 359, 482, 23, 87, 87, 87, 21, 282, 165, 217, 183, 166, 359, 359, 294, 295, 482, 23, 87, 87, 87, 21, 282, 165, 166, 200, 166, 359, 359, 311, 312, 482, 23, 87, 87, 87, 21, 282, 233, 190, 190, 190, 498, 498, 498, 498, 499, 23, 87, 87, 87, 21, 282, 250, 215, 215, 215, 54, 54, 54, 54, 54, 91, 87, 87, 87, 89, 54, 54, 54, 54, 54, 71, 71, 71, 71, 71, 108, 87, 87, 87, 70, 71, 71, 71, 71, 71,
+
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  5,   5,   5,   5,   6, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			285, 285, 285, 286,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			464, 464, 465, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			379, 380, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			396, 397, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
+			291, 292, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			308, 309, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			296, 297, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			313, 314, 482, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			498, 498, 499, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			353, 353, 353, 303,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			370, 370, 370, 371,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			387, 387, 387, 388,  23, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			 58,  58,  58,  58,  59, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			 75,  75,  75,  75,  76, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 139, 140,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 156, 157,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 172, 173, 174,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 157, 158, 158,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 157, 158, 175,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 157, 158, 192,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 157, 158, 209,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 225, 226, 191,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 206, 207, 208,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 225,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 242,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  5,   5,   6,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			 22,  22,  23,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  39,   39,   40,   41,   41, 42, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  464,   464,   464,   464,   465, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  50,   481,   294,   295,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  67,   481,   311,   312,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  84,   481,   481,   481,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  378,   378,   379,   380,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  395,   396,   396,   397,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  412,   413,   413,   414,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  481,   481,   481,   481,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  481,   481,   481,   481,   482, 23, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  498,   498,   498,   498,   499, 40, 41, 42, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    22,    22,  22,22, 23, 2, 2, 2, 2, 2, 2, 2,
+			  22,     22,    22,    57,    58,  58,58, 59, 2, 2, 2, 2, 2, 2, 2,
+			  57,     55,    56,    74,    75,  75,75, 76, 2, 2, 2, 2, 2, 2, 2,
+			  91,   89,   90,   91,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  108,   106,   107,   108,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			  2,   2,   2,   2,   2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+	],
+	gettile: function(col, row){
+		return this.tiles[row * map.cols + col]
+	}
+};
+
+var camera = {
+	width: W,
+	height: H,
+	maxY: map.rows * map.tsize - H,
+	x: 0,
+	y: map.rows * map.tsize - H,
+};
+
+var pilotImage = new Image();
+pilotImage.src = 'avion1.png';
+
+var enemyPlaneLImage = new Image();
+enemyPlaneLImage.src = 'avion2l.png';
+
+var enemyPlaneRImage = new Image();
+enemyPlaneRImage.src = 'avion2d.png';
+
+var enemyPlaneImage = new Image();
+enemyPlaneImage.src = 'avion2.png';
+
+var bulletImage = new Image();
+bulletImage.src = 'bullet.png';
+
+var pilot = {
+	speed : 180,
+	x : 224,
+	y : 300,
+	width : 32,
+	height : 32,
+	r : 12,
+	active : false
+};
+
+var enemy = [];
+
+var bullet = [];
+
+var explosion = [];
+
+var keysDown = {};
+
+var canShoot = false;
+
+var gameOverText = false;
+
+var firesnd = new Audio("151022__bubaproducer__laser-shot-silenced.wav");
+var explsnd = new Audio("244345__willlewis__musket-explosion.wav");
+
+addEventListener("keydown", function (e) {
+	keysDown[e.keyCode] = true;
+}, false);
+
+addEventListener("keyup", function (e) {
+	delete keysDown[e.keyCode];	
+}, false);
+
+function hitBox(source, target){
+	// Da li se dodiruju?
+	for (var i=0; i<target.length; i++){
+		if (target[i] != null){
+			if (	
+					source.x <= (target[i].x + target[i].width)
+					&& target[i].x <= (source.x + source.width)
+					&& source.y <= (target[i].y + target[i].height)
+					&& target[i].y <= (source.y + source.height)
+			) {
+				window.cancelAnimationFrame(requestID);
+			}
+		}
+	}
+}
+
+function hitCircle(source, target){
+	// Da li se dodiruju?
+	if (typeof source !== "undefined"  && typeof target !== "undefined"){
+		var distance;
+		var x1, x2, y1, y2;
+		x1 = source.x + source.width/2;
+		y1 = source.y + source.height/2;
+		x2 = target.x + target.width/2;
+		y2 = target.y + target.height/2;
+		distance = Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1))
+		if (	
+				distance < source.r + target.r
+		) {
+			return true;
+		}
+	}	
+}
+
+function checkBounds(sprite){
+	return (sprite.x < -64 || sprite.x >544 || sprite.y < -64 || sprite.y > 384);
+}
+
+function fireBullet (x, y){
+	if (pilot.active){
+		bullet.push ({x: x+15, y: y-6, height: 6, width: 2, r: 1});
+		firesnd.currentTime = 0;
+		firesnd.play();
+		canShoot = false;
+		setTimeout((function(){canShoot=true;}),250);
+	}
+}
+
+function explAnim(sprite){
+	explosion.push ({x: sprite.x, y: sprite.y, stripX: 0, counter:0});
+}
+
+function stopTimeouts(){
+    for(var i=0; i<timeouts.length; i++)
+    {
+        clearTimeout(timeouts[i]);
+    }
+
+    timeouts = [];
+}
+
+function update(modifier) {
+	if (38 in keysDown) { // Player holding up
+		pilot.y -= pilot.speed * modifier;
+		if (pilot.y < 32) {
+			pilot.y = 32;
+		} 
+	}
+	if (40 in keysDown) { // Player holding down
+		pilot.y += pilot.speed * modifier;
+		if (pilot.y > 328) {
+			pilot.y = 328;
+		} 
+	}
+	if (37 in keysDown) { // Player holding left
+		pilot.x -= pilot.speed * modifier;
+		if (pilot.x < 0) {
+			pilot.x = 0;
+		} 
+	}
+	if (39 in keysDown) { // Player holding right
+		pilot.x += pilot.speed * modifier;
+		if (pilot.x > 448) {
+			pilot.x = 448;
+		} 
+	}
+
+	if (32 in keysDown) { // Player pressed space
+		if (canShoot){
+			fireBullet(pilot.x, pilot.y);
+		}
+	}
+
+	if (enemy[0]){
+		enemy[0].x -= enemy[0].speed * modifier;
+	}
+
+	if (enemy[1]){
+		enemy[1].x += enemy[1].speed * modifier;
+	}
+
+	if (enemy[2]){
+		enemy[2].x -= enemy[2].speed * modifier;
+	}
+
+	if (enemy[3]){
+		enemy[3].x -= enemy[3].speed * modifier;
+	}
+
+	if (enemy[4]){
+		enemy[4].y += enemy[4].speed * modifier;
+	}	
+
+	if (enemy[5]){
+		enemy[5].y += enemy[5].speed * modifier;
+	}
+
+	if (enemy[6]){
+		enemy[6].y += enemy[6].speed * modifier;
+	}
+
+	if (enemy[7]){
+		enemy[7].x -= enemy[7].speed * modifier;
+	}
+
+	if (enemy[8]){
+		enemy[8].x += enemy[8].speed * modifier;
+	}
+
+	if (enemy[9]){
+		if (enemy[9].y < 240){
+			enemy[9].y += enemy[9].speed * modifier;
+		} else{
+			enemy[9].x += enemy[9].speed * modifier;
+		}
+	}
+
+	if (enemy[10]){
+		if (enemy[10].y < 176){
+			enemy[10].y += enemy[10].speed * modifier;
+		} else{
+			enemy[10].x += enemy[10].speed * modifier;
+		}
+	}	
+
+	for (var i=11; i<=12; i++){
+		if (enemy[i]){
+			if (enemy[i].y < 256 && enemy[i].x >68){
+				enemy[i].y += enemy[i].speed * modifier;
+			} else if (enemy[i].x > 64){
+				enemy[i].x -= enemy[i].speed * modifier;
+			}
+			if(enemy[i].y <= 260 && enemy[i].x <= 64){
+				enemy[i].y -= enemy[i].speed * modifier;
+			}
+		}
+	}	
+	
+	for (var i = 0, len = enemy.length; i < len; i++) {
+		if(typeof enemy[i] !== "undefined"){
+	  		if (checkBounds(enemy[i])){
+				delete enemy[i];
+			}
+		}
+	}
+
+	for (var j = 0, len1 = bullet.length; j < len1; j++) {
+		if(typeof bullet[j] !== "undefined"){
+	  		if (checkBounds(bullet[j])){
+				delete bullet[j];
+			}
+			else{
+				for (var k=0; k<enemy.length; k++){
+					if (typeof enemy[k] !== "undefined"){
+						if (hitCircle(bullet[j], enemy[k])){
+							explAnim(enemy[k]);
+							explsnd.currentTime = 0;
+							explsnd.play();
+							delete bullet[j];
+							delete enemy[k];
+							
+						} 
+					}
+				}	
+			}
+			if (typeof bullet[j] !== "undefined"){
+				bullet[j].y = bullet[j].y - 6;
+			}
+		}
+	}
+
+	for (var k=0; k<enemy.length; k++){
+		if (typeof enemy[k] !== "undefined" && pilot.active){
+			if (hitCircle(pilot, enemy[k])){
+				explAnim(pilot);
+				explAnim(enemy[k]);
+				explsnd.currentTime = 0;
+				explsnd.play();
+				pilot.active = false;
+				delete enemy[k];
+				stopTimeouts();
+				setTimeout(function(){gameOverText = true;}, 2000);
+				removeEventListener("keydown", function (e) {
+					keysDown[e.keyCode] = true;
+				}, false);
+
+				removeEventListener("keyup", function (e) {
+					delete keysDown[e.keyCode];	
+				}, false);
+
+				keysDown = {};
+			}
+		}
+	}	
+}
+
+function renderGame() {
+	requestId = window.requestAnimationFrame(renderGame);
+	var now = performance.now();
+	var delta = now - then;
+	timer = timer + (delta/1000);
+	update(delta/1000);
+	then = now;
+
+	var firstTile = Math.floor(camera.y/map.tsize) * map.cols;
+	var lastTile = firstTile + (Math.ceil(H/map.tsize)+1) * map.cols;
+
+	ctx.clearRect(0, 0, W, H);
+	ctx.save();
+	ctx.translate(0, -camera.y);
+	if (camera.y > -H){
+		for (var i=firstTile; len = lastTile, i < lastTile; i++){
+			ctx.drawImage(tileAtlas, ((map.tiles[i]-1)%17)*map.tsize, Math.floor(map.tiles[i]/17)*map.tsize, 32, 32, (i%map.cols)*map.tsize, Math.floor(i/map.cols)*map.tsize, 32, 32);
+		}
+	}
+	if(camera.y < 0){
+		for (var i=0, len = (Math.ceil(H/map.tsize)+1) * map.cols*2; i<len; i++){
+			ctx.drawImage(tileAtlas, 32, 0, 32, 32, (i%map.cols)*map.tsize, -Math.floor(i/map.cols)*map.tsize, 32, 32);
+		}
+	}
+
+	ctx.restore();
+	if(pilot.active){
+		ctx.drawImage(pilotImage, pilot.x, pilot.y);
+	}
+
+	if (enemy[0]){
+		ctx.save();
+		ctx.translate(enemy[0].x + 16, enemy[0].y + 16);
+		ctx.rotate(-90 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+	if (enemy[1]){
+		ctx.save();
+		ctx.translate(enemy[1].x + 16, enemy[1].y + 16);
+		ctx.rotate(90 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+	if (enemy[2]){
+		ctx.save();
+		ctx.translate(enemy[2].x + 16, enemy[2].y + 16);
+		ctx.rotate(-90 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+	if (enemy[3]){
+		ctx.save();
+		ctx.translate(enemy[3].x + 16, enemy[3].y + 16);
+		ctx.rotate(-90 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}	
+	if (enemy[4]){
+		ctx.save();
+		ctx.translate(enemy[4].x + 16, enemy[4].y + 16);
+		ctx.rotate(180 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+	if (enemy[5]){
+		ctx.save();
+		ctx.translate(enemy[5].x + 16, enemy[5].y + 16);
+		ctx.rotate(180 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+	if (enemy[6]){
+		ctx.save();
+		ctx.translate(enemy[6].x + 16, enemy[6].y + 16);
+		ctx.rotate(180 * Math.PI / 180);
+		ctx.drawImage(enemyPlaneImage, -16, -16);
+		ctx.restore();
+	}
+
+	if (enemy[7]){
+		ctx.drawImage(enemyPlaneLImage, enemy[7].x, enemy[7].y);
+	}
+	if (enemy[8]){
+		ctx.drawImage(enemyPlaneRImage, enemy[8].x, enemy[8].y);
+	}
+
+	if (enemy[9]){
+		if(enemy[9].y < 240){
+			ctx.save();
+			ctx.translate(enemy[9].x + 16, enemy[9].y + 16);
+			ctx.rotate(180 * Math.PI / 180);
+			ctx.drawImage(enemyPlaneImage, -16, -16);
+			ctx.restore();
+		} else{
+			ctx.save();
+			ctx.translate(enemy[9].x + 16, enemy[9].y + 16);
+			ctx.rotate(90 * Math.PI / 180);
+			ctx.drawImage(enemyPlaneImage, -16, -16);
+			ctx.restore();
+		}
+	}
+
+	if (enemy[10]){
+		if(enemy[10].y < 176){
+			ctx.save();
+			ctx.translate(enemy[10].x + 16, enemy[10].y + 16);
+			ctx.rotate(180 * Math.PI / 180);
+			ctx.drawImage(enemyPlaneImage, -16, -16);
+			ctx.restore();
+		} else{
+			ctx.save();
+			ctx.translate(enemy[10].x + 16, enemy[10].y + 16);
+			ctx.rotate(90 * Math.PI / 180);
+			ctx.drawImage(enemyPlaneImage, -16, -16);
+			ctx.restore();
+		}
+	}
+
+	for (var i=11; i<=12; i++){
+		if (enemy[i]){
+			if(enemy[i].y < 256 && enemy[i].x >68){
+				ctx.save();
+				ctx.translate(enemy[i].x + 16, enemy[i].y + 16);
+				ctx.rotate(180 * Math.PI / 180);
+				ctx.drawImage(enemyPlaneImage, -16, -16);
+				ctx.restore();
+			} else if (enemy[i].x > 64){
+				ctx.save();
+				ctx.translate(enemy[i].x + 16, enemy[i].y + 16);
+				ctx.rotate(-90 * Math.PI / 180);
+				ctx.drawImage(enemyPlaneImage, -16, -16);
+				ctx.restore();
+			} 
+			if(enemy[i].y <= 260 && enemy[i].x <= 64){
+				ctx.drawImage(enemyPlaneImage, enemy[i].x, enemy[i].y);
+			}
+		}
+	}
+
+
+	for (var j = 0, len = bullet.length; j < len; j++) {
+		if(typeof bullet[j] !== "undefined"){
+	  		ctx.drawImage(bulletImage, bullet[j].x, bullet[j].y);
+		}
+	}
+
+	for (var i = 0, len = explosion.length; i < len; i++) {
+		if(typeof explosion[i] !== "undefined"){
+	  		ctx.drawImage(explStrip, explosion[i].stripX, 0, 32, 32, explosion[i].x, explosion[i].y, 32, 32);
+	  		explosion[i].y +=1;
+	  		if (explosion[i].counter %3 == 1){		//svaki treci frejm animacije se menja frejm eksplozije
+		  		explosion[i].stripX +=32;		  		
+		  	}
+		  	explosion[i].counter +=1;
+			if (explosion[i].stripX == 768){
+		  		delete explosion[i];
+		  	}
+		}
+	}
+
+	ctx.fillStyle = "rgb(250, 250, 250)";
+	ctx.font = "30px arcadeClassic";
+	ctx.textAlign = "right";
+	ctx.textBaseline = "top";
+	ctx.fillText(Math.trunc(timer), 464, 16);
+
+	if (gameOverText == true){
+		ctx.font = '60pt arcadeClassic';
+    	ctx.textAlign = 'center';
+    	ctx.textBaseline = "middle";
+    	ctx.fillStyle = "rgb(238, 238, 119)";
+    	ctx.fillText('Game over', canvas.width/2, canvas.height/2);
+    	ctx.fillStyle = "rgb(250, 250, 250)";
+		ctx.font = "24px arcadeClassic";
+		ctx.fillText('PRESS  SPACE  TO  PLAY  AGAIN', canvas.width/2, canvas.height*3/4);
+		canShoot = false;
+		document.addEventListener("keypress", _listener);
+	}
+
+	if (camera.y == -720){
+		camera.y = -368;
+	}
+	camera.y -=1;
+}
+
+var _listener = function(){
+					gameOverText = false;
+					pilot.active = true;
+					window.cancelAnimationFrame(requestId);
+					pilot.x = 224;
+					pilot.y = 300;
+					camera.y = map.rows * map.tsize - H;
+					enemy = [];
+					stopTimeouts();
+					timer = 0;
+					setTimeout((function(){canShoot=true;}),250);
+					then = performance.now();
+					document.removeEventListener("keypress", _listener);
+    				renderGame();
+    				timeouts.push(setTimeout(function(){enemy.push ({x: 480, y: 64, height: 32, width: 32, r: 12, speed: 90});}, 3000));	//0
+					timeouts.push(setTimeout(function(){enemy.push ({x: -32, y: 96, height: 32, width: 32, r: 12, speed: 90});}, 5000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 480, y: 128, height: 32, width: 32, r: 12, speed: 90});}, 7000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 480, y: 160, height: 32, width: 32, r: 12, speed: 105});}, 7500));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 320, y: -32, height: 32, width: 32, r: 12, speed: 90});}, 9000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 240, y: -32, height: 32, width: 32, r: 12, speed: 90});}, 9500));	//5
+					timeouts.push(setTimeout(function(){enemy.push ({x: 160, y: -32, height: 32, width: 32, r: 12, speed: 90});}, 10000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 480, y: 64, height: 32, width: 32, r: 12, speed: 90});}, 15000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: -32, y: 96, height: 32, width: 32, r: 12, speed: 90});}, 15000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 120, y: -32, height: 32, width: 32, r: 12, speed: 120});}, 20000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 184, y: -32, height: 32, width: 32, r: 12, speed: 120});}, 20000));	//10
+					timeouts.push(setTimeout(function(){enemy.push ({x: 416, y: -32, height: 32, width: 32, r: 12, speed: 120});}, 25000));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 416, y: -32, height: 32, width: 32, r: 12, speed: 120});}, 25500));
+					timeouts.push(setTimeout(function(){enemy.push ({x: 416, y: -32, height: 32, width: 32, r: 12, speed: 120});}, 26000));
+}
+
+window.onload = function startScreen(){
+	ctx.clearRect(0, 0, W, H);
+	ctx.font = "60pt arcadeClassic";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgb(238, 238, 119)";
+    ctx.fillText('Riverworld', canvas.width/2, canvas.height/4);
+	ctx.fillStyle = "rgb(250, 250, 250)";
+	ctx.font = "24px arcadeClassic";
+	ctx.fillText('PRESS  SPACE  TO  START', canvas.width/2, canvas.height/2);
+	document.addEventListener("keypress", _listener);
+};
+
+var timeouts = [];
+
+</script>
